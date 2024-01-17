@@ -1,7 +1,7 @@
 =========
 ASTEROIDS
 =========
-I cribbed this from james me@jamessocol.com cheers james.
+I cribbed the bare bones of this from james me@jamessocol.com cheers james.
 I then added a few things like sound etc. 
 i just liked the way he coded the engine cheers.
 So enjoy it and kill all those enemy ships and rocks.
