@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta http-equiv="Content-type" content="text/html;charset=utf-8"/>
+  <title>Asteroids</title>
+  
+  <style>
+  body {
+    background-color: #000;
+    color: #fff;
+    font-family: "Sans", "System", monospace;
+    font-size: 14px;
+}
+
+div#asteroids {
+position:absolute;
+
+  left: 0px;
+    width: 940px;
+
+    padding: 5px;
+}
+#canvas{
+
+
+
+
+}
+
+#overlay{
+position:absolute;
+top: 0px;
+left:0px;
+width: 100%;
+height: 100%;
+opacity: 0.3;
+background-color: white;
+visibility: hidden;
+}
+
+#aliens{
+position:absolute;
+top: 0px;
+left:0px;
+width: 100%;
+height: 100%;
+}
+
+#photon{
+position:absolute;
+top: 0px;
+left:0px;
+width: 100%;
+height: 100%;
+}
+
+
+
+
+#bullets{
+position:absolute;
+top: 0px;
+left:0px;
+width: 100%;
+height: 100%;
+
+
+
+}
+#overs{
+position:absolute;
+top: 0px;
+left:0px;
+width: 100%;
+height: 100%;
+
+
+
+}
+div#asteroids > * {
+    color: #fff;
+}
+
+div#asteroids > div {
+    font-family: "System", monospace;
+    font-size: 11px;
+    padding-bottom: 5px;
+}
+
+div#asteroids > div > span {
+    float: right;
+    padding-left: 0px;
+}
+
+div#instructions {
+    width: 640px;
+    margin: 0px auto;
+}
+
+h1 {
+    font-size: 18px;
+}
+
+h2 {
+    font-size: 16px;
+}
+
+div.a {
+width: 7px;
+height:7px;
+ background-color:red;
+position:fixed;
+        border-radius: 4px;
+		  background: linear-gradient(35deg, grey, black,  #FF80FF, black);
+}
+
+#movingDiv {
+  width: 50px;
+  height: 50px;
+  background-color: yellow;
+  position: absolute;
+  z-index: 34567;
+}
+
+  </style>
+  <script src="js/jquery.min.js"></script>
+</head>
+
+<body>
+<div id="asteroids">Asteroids !</div>
+<canvas id='overlay'></canvas>
+<canvas id='overs'></canvas>
+<canvas id='aliens'></canvas>
+<canvas id='bullets'></canvas>
+<canvas id='photon'></canvas>
+
+<div class='a'  id='a'></div>
+<audio id="crashsound" src="crash.wav"></audio>
+<audio loop  id="gameoversound" src="space.mp3"></audio>
+<audio id="shotsound" src="laser.wav"></audio>
+<audio volume='0.1' id="torpedosound" src="launch.wav"></audio>
+
+<script >
+// original code and engine by Genius james socol me@jamessocol.com cheers james
+// aditional photon torpedos, alienships, sounds and instructions by steve carlton: carltonmob@gmail.com
+
+// Game settings
+GAME_HEIGHT = window.innerHeight-40;
+GAME_WIDTH = window.innerWidth-30;
+FRAME_PERIOD = 50; // 1 frame / x frames/sec
+LEVEL_TIMEOUT = 2000; // How long to wait after clearing a level.
+
+// Player settings
+ROTATE_SPEED = Math.PI/10; // How fast do players turn?  (radians)
+MAX_SPEED = 15; // Maximum player speed
+THRUST_ACCEL = 1;
+DEATH_TIMEOUT = 2000; // milliseconds
+INVINCIBLE_TIMEOUT = 1500; // How long to stay invincible after resurrecting?
+var PLAYER_LIVES = 3;
+POINTS_PER_SHOT = 3; // How many points does a shot cost? (Should be >= 0.)
+POINTS_TO_EXTRA_LIFE = 1000; // How many points to get a 1-up?
+ var life=0;
+// Bullet settings
+BULLET_SPEED = 15;
+MAX_BULLETS = 7;
+MAX_BULLET_AGE = 30;
+BULLET_DEATH = 5000;// WE ALL HAVE A SELL BY DATE
+BULLET_DISTANCE=0;
+BULLETORP_DEATH = 5000;// WE ALL HAVE A SELL BY DATE
+BULLETORP_DISTANCE=0;
+STARTED_GAME=false;
+// Asteroid settings
+ASTEROID_COUNT = 3; // This + current level = number of asteroids.
+ASTEROID_GENERATIONS = 4; // How many times to they split before dying?
+ASTEROID_CHILDREN = 2; // How many does each death SPAWN?
+ASTEROID_SPEED = 3;
+ASTEROID_SCORE = 15; // How many points is each one worth?
+AIENKILLED_SCORE = 100;
+AILIEN_HIT=0;
+AILIEN_ADDLIFE=1;
+ASTEROID_SPIN = 0.006; // How FAST IT SPINS?
+STAR_SIZE = 3;
+STARSIZE_MULTIPLIER = 3.9; // RANDOM SIZE UP TO 3.9
+GAMEOVER=false;
+// PHOTON TORPEDO'S
+var PHOTON_TORPS=2;// ONLY 2 AWW
+TORP_SPEED=0.3;
+TORP_POWER=14; //blast radius
+var _check=0;
+var checks;
+
+// JET BLAST IMPLIMENTATION
+pushed=false;
+leftpushed=false;
+rightpushed=false;
+var scale=4;
+
+// TIMINGS FOR DEBUG TEST
+var startTime = 0;
+	var endTime =0;
+	var elapsedTime = 0;
+	
+
+// Play the sound once
+
+	// OVERLAY CANVAS FOR FLASH
+canv = document.getElementById('overlay');
+ctxover = canv.getContext('2d');
+canvo = document.getElementById('overs');
+ctxo = canvo.getContext('2d');
+
+ails= document.getElementById('aliens');//alien craft
+ctxalien = ails.getContext('2d');
+	slugs= document.getElementById('bullets');//alien bullets
+ctxslug = slugs.getContext('2d');
+	torpedos= document.getElementById('photon');//alien bullets
+ctxtorp = torpedos.getContext('2d');
+
+	// Target  players position where the bullet will move to
+var targetX = 145;
+var targetY = 75;
+var tarX = 145;
+var tarY = 75;
+
+
+// torpedo init stuff
+var torpX = torpedos.width/2;
+var torpY = 100;
+var torpedo = false;
+
+  var distorpX=0;  
+  var distorpY =100;
+  var bulletorpx=targetX ;
+  var bulletorpy=targetY ;
+
+  
+	// Initial position and speed of the alien
+	 var posalien = [0, 0];
+alienX = 50;
+alienY = 50;
+alienSpeedX = 1;
+alienSpeedY = 1;
+var getbull;
+	
+
+
+//Distance from alien bullet to player ship 
+var  distanceX;
+var  distanceY;
+
+// Alien craft is prowling or not
+var danger=false;
+var alienship=false;
+var alienship2=false;
+// Current position of the alien bullet
+var bulletx = 50;
+var bullety = 50;
+
+// speed of alien missiles
+var bulletspeed = 0.4;
+var tttt=2;
+//high low envelope to initialize alien ship appearance
+var scorelow=200;
+var scorehigh=300;
+var countup=0;
+var keyworks=false;
+
+
+class Particle {// create class for explosion particles
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.radius = 1.5;
+    this.velocity = {
+      x: (Math.random() - 0.5) * 3,
+      y: (Math.random() - 0.5) * 3
+    };
+	
+	    this.colores = {
+     a: rnd(),
+      b: rnd()
+    };
+	
+    this.alpha = 1;
+  }
+
+  draw() {
+    ctxalien.save();
+    ctxalien.globalAlpha = this.alpha;
+    ctxalien.fillStyle = this.a;
+    ctxalien.beginPath();
+    ctxalien.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+    ctxalien.fill();
+    ctxalien.restore();
+  }
+
+  update() {
+    this.draw();
+    this.velocity.x *= 1.38;
+    this.velocity.y *= 1.38;
+    this.x += this.velocity.x;
+    this.y += this.velocity.y;
+    this.alpha -= 0.02;
+  }
+}
+
+function createexplodeParticles(x, y, cole) {
+  const particles = [];
+  for (let i = 0; i < 450; i++) {
+ var cole=rnd(); 
+    particles.push(new Particle(x, y, cole));
+  }
+  return particles;
+}
+
+function explodeexplode(x, y) {
+  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+  const particles = createexplodeParticles(x, y, colors[Math.floor(Math.random() * colors.length)]);
+  function animate() {
+    requestAnimationFrame(animate);
+  
+   	  ctxalien.clearRect(0, 0, ails.width, ails.height);
+
+	  
+    particles.forEach((particle, index) => {
+      if (particle.alpha > 0) {
+        particle.update();
+      } else {
+        particles.splice(index, 0.2);
+      }
+    });
+  }
+  animate();
+
+}
+
+function endgame(){
+        ctxo.font = '30px System, monospace';
+                ctxo.textAlign = 'center';
+                ctxo.textBaseline = 'middle';
+                ctxo.setTransform(1, 0, 0, 1, 0, 0);
+                ctxo.fillText('GAME OVER', GAME_WIDTH/2, GAME_HEIGHT/2);
+
+                var scores = game.highScores.getScores();
+                ctxo.font = '12px System, monospace';
+			
+                for (var i=0; i<scores.length; i++) {
+                    ctxo.fillText(scores[i].name + '   ' + scores[i].score,
+                                 GAME_WIDTH/2, GAME_HEIGHT/2 + 20 + 14 * i);
+           
+            }
+      }
+	
+Asteroids = function(home) {
+    // Constructor
+    // Order matters.
+
+    // Set up logging.
+    this.log_level = Asteroids.LOG_DEBUG;
+    this.log = Asteroids.logger(this);
+
+    // Create the info pane, player, and playfield.
+    home.innerHTML = '';
+    this.info = Asteroids.infoPane(this, home);
+    this.playfield = Asteroids.playfield(this, home);
+    this.player = Asteroids.player(this);
+
+    // Set up the event listeners.
+    this.keyState = Asteroids.keyState(this);
+    this.listen = Asteroids.listen(this);
+
+    // Useful functions.
+    this.asteroids = Asteroids.asteroids(this);
+    this.overlays = Asteroids.overlays(this);
+    this.highScores = Asteroids.highScores(this);
+    this.level = Asteroids.level(this);
+    this.gameOver = Asteroids.gameOver(this);
+
+    // Play the game.
+    Asteroids.play(this);
+    return this;
+}
+
+
+// USER STUFF
+Asteroids.infoPane = function(game, home) {
+    var pane = document.createElement('div');
+    pane.innerHTML = 'ASTEROIDS';
+
+    var lives = document.createElement('span');
+    lives.className = 'lives';
+    lives.innerHTML = '   LIVES: ' + PLAYER_LIVES;
+
+    var score = document.createElement('span');
+    score.className = 'score';
+    score.innerHTML = '   SCORE: 0';
+
+    var level = document.createElement('span');
+    level.className = 'level';
+    level.innerHTML = '   LEVEL: 1';
+
+	    var check = document.createElement('span');
+   check.className = 'check';
+    check.innerHTML = '  PHOTONS:   0  ';
+	
+	
+    pane.appendChild(lives);
+    pane.appendChild(score);
+	 pane.appendChild(check);
+    pane.appendChild(level);
+    home.appendChild(pane);
+
+    return {
+        setLives: function(game, l) {
+            lives.innerHTML = '   LIVES: ' + l;
+        },
+        setScore: function(game, s) {
+            score.innerHTML = '   SCORE: ' + s;
+        },
+        setLevel: function(game, _level) {
+            level.innerHTML = '   LEVEL: ' + _level;
+        },
+		
+		  setCheck: function(game, _check) {
+            check.innerHTML = '   PHOTONS:  ' + _check;
+        },
+		
+        getPane: function() {
+            return pane;
+        }
+    }
+}
+width = 800;
+var height = 400;
+  var apos;
+ var torapos;
+  var bpos;
+
+  
+  
+Asteroids.playfield = function(game, home) {
+    var canvas = document.createElement('canvas');
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+    home.appendChild(canvas);
+	width=GAME_WIDTH;
+	 document.body.appendChild(canvas);  
+	  
+	 height = GAME_HEIGHT;
+    return canvas;
+	
+}
+
+
+let frame = 0;
+var distort = 0;
+var seto =1;
+
+var tim=0;
+  // var rad=0.86;
+   var col='red';
+    var leno=0;//trail length
+	 let trail = [];
+    const starz = [];
+   const starzize = [];
+var depth,
+xkx=6.6,
+maxim=-1.06, 
+trim=1.6;
+	var fds=0;
+
+	 var blackHole = {
+      x: width / 2,
+      y: height / 2,
+      radius: 20,
+    };
+	
+    function initstars() {// save starz
+	
+      for (let i = 35; i > 0; i--) {
+        starz.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+		ss:  Math.random() *3.9,
+		colr:  rnd(),
+        });
+      }
+    }
+	
+	   function rnd() {// get star colors
+      const red = Math.floor(Math.random() * 256);
+      const green = Math.floor(Math.random() * 256);
+      const blue = Math.floor(Math.random() * 256);
+
+      return `rgb(${red}, ${green}, ${blue})`;
+    }
+	
+
+	
+	 function updateStarPosition(staro) {
+
+      const speedo = 1; // Adjust the speed of starz
+      const angle = Math.atan2(blackHole.y - staro.y, blackHole.x - staro.x);
+      staro.x += Math.cos(angle) * speedo+distort;
+      staro.y += Math.sin(angle) * speedo;
+
+      // Reset staro position if it gets too close to the black hole
+      const distanceToBlackHole = Math.sqrt((staro.x - blackHole.x) ** 2 + (staro.y - blackHole.y) ** 2);
+      if (distanceToBlackHole < blackHole.radius) {
+        staro.x = Math.random() * width;
+        staro.y = Math.random() * height;
+	
+      }
+	 
+    }
+
+	    function drawStar(x, y, ss, colr) {
+
+	     cols=rnd();
+       ctxo.beginPath();
+	      ctxo.fillStyle = 'white';   
+      ctxo.arc(x, y, ss, 0, 2 * Math.PI);
+
+      ctxo.fill();
+          ctxo.closePath();
+	}
+	
+		
+   
+
+	
+	
+	
+Asteroids.logger = function(game) {
+    if (typeof console != 'undefined' &&
+        typeof console.log != 'undefined') {
+        return {
+            info: function(msg) {
+                if (game.log_level <= Asteroids.LOG_INFO)
+                    console.log(msg);
+            },
+            debug: function(msg) {
+                if (game.log_level <= Asteroids.LOG_DEBUG)
+                    console.log(msg);
+            },
+            warning: function(msg) {
+                if (game.log_level <= Asteroids.LOG_WARNING)
+                    console.log(msg);
+            },
+            error: function(msg) {
+                if (game.log_level <= Asteroids.LOG_ERROR)
+                    console.log(msg);
+            },
+            critical: function(msg) {
+                if (game.log_level <= Asteroids.LOG_CRITICAL)
+                    console.log(msg);
+            }
+        }
+    }
+    else {
+        return {
+            info: function(msg){},
+            debug: function(msg){},
+            warning: function(msg){},
+            error: function(msg){},
+            critical: function(msg){},
+        }
+    }
+}
+
+Asteroids.asteroids = function(game) {
+    var asteroids = [];
+
+    return {
+        push: function(obj) {
+            return asteroids.push(obj);
+        },
+        pop: function() {
+            return asteroids.pop();
+        },
+        splice: function(i, j) {
+            return asteroids.splice(i, j);
+        },
+        get length() {
+            return asteroids.length;
+        },
+        getIterator: function() {
+            return asteroids;
+        },
+        generationCount: function(_gen) {
+            var total = 0;
+            for (var i=0; i<asteroids.length; i++) {
+                if (asteroids[i].getGeneration() == _gen)
+                    total++;
+            }
+            game.log.debug('Found ' + total + ' asteroids in generation ' +
+                           _gen);
+            return total;
+        }
+    }
+}
+
+/**
+ * Creates an overlays controller.
+ */
+Asteroids.overlays = function(game) {
+
+    var overlays = [];
+
+    return {
+        draw: function(ctx) {
+            for (var i=0; i<overlays.length; i++) {
+                overlays[i].draw(ctx);
+            }
+        },
+        add: function(obj) {
+            if (-1 == overlays.indexOf(obj) &&
+                typeof obj.draw != 'undefined') {
+                overlays.push(obj);
+                return true;
+            }
+            return false;
+        },
+        remove: function(obj) {
+            var i = overlays.indexOf(obj);
+            if (-1 != i) {
+                overlays.splice(i, 1);
+                return true;
+            }
+            return false;
+        }
+    }
+}
+
+/**
+ * Creates a player object.
+ */
+Asteroids.player = function(game) {
+    // implements IScreenObject
+	
+    var position = [GAME_WIDTH/2, GAME_HEIGHT/2],
+        velocity = [0, 0],
+        direction = -Math.PI/2,
+        dead = false,
+        invincible = false,
+        lastRez = null,
+        lives = PLAYER_LIVES,
+        score = 0,
+		check = 0,
+        radius = 3,
+	
+	     leftretro = [
+            [17, 0],
+            [-19, 9],
+            [-9, 0],
+            [-19, -9],
+			
+			 [17, 0],
+			   [-11, 7],
+			      [-13, 16],
+				    [-19, 9],
+        ];
+		
+		     rightretro = [
+            [17, 0],
+            [-19, 9],
+            [-9, 0],
+            [-19, -9],
+			
+			 [17, 0],
+			 	 [-11, -7],
+			      [-13, -16],
+				   [-19, -9],
+        ];
+
+        paths = [ //static ship
+            [17, 0],
+            [-19, 9],
+            [-9, 0],
+            [-19, -9],
+			
+			 [17, 0],
+			
+        ];
+
+	
+
+		
+		      path = [//rocket flames
+            [17, 0],
+            [-19, 9],
+            [-9, 0],
+            [-19, -9],
+			 [17, 0],
+		  [-19, 9],
+		   [-29, 0],
+		     [-19, -9],
+			   [-12, -4],
+			  [-29, 0],
+			     [-12, 4],
+		  
+        ];
+		
+		
+    return {
+	
+	
+	
+        getPosition: function() {
+            return position;
+        },
+        getVelocity: function() {
+            return velocity;
+        },
+        getSpeed: function() {
+          //  return Math.sqrt(Math.pow(80[0], 12) + Math.pow(80[1], 2));
+        },
+        getDirection: function() {
+          //  return direction;
+        },
+        getRadius: function() {
+            return radius;
+        },
+        getScore: function() {
+            return score;
+        },
+		
+		  getCheck: function() {
+            return check;
+        },
+		
+        addScore: function(pts) {
+            score += pts;
+			
+	
+
+			
+			
+			check = elapsedTime;
+			             
+        },
+        lowerScore: function(pts) {
+            score -= pts;
+            if (score < 0) {
+                score = 0;
+            }
+        },
+        getLives: function() {
+            return lives;
+			
+	
+        },
+        rotate: function(rad) {
+	
+		
+            if (!dead) {
+                direction += rad;
+                game.log.info(direction);
+            }
+        },
+        thrust: function(force) {
+            if (!dead) {
+                velocity[0] += force * Math.cos(direction);
+                velocity[1] += force * Math.sin(direction);
+
+                if (this.getSpeed() > MAX_SPEED) {
+                    velocity[0] = MAX_SPEED * Math.cos(direction);
+                    velocity[1] = MAX_SPEED * Math.sin(direction);
+                }
+
+                game.log.info(velocity);
+            }
+        },
+        move: function() {
+            Asteroids.move(position, velocity);
+        },
+        draw: function(ctx) {
+            let color = '#fff';
+			
+		
+			    let colors = 'orange';
+				   let coloro = 'orange';
+            if (invincible) {
+                const dt = ((new Date) - lastRez) / 200;
+                const c = Math.floor(Math.cos(dt) * 16).toString(16);
+                color = `white`;
+            }
+			if(pushed===true){
+				document.getElementById('gameoversound').play();
+            Asteroids.drawPath(ctx, position, direction, 1, path, colors);
+			}else{
+			      Asteroids.drawPath(ctx, position, direction, 1, paths, color);//paths
+			}
+			
+				if(leftpushed===true){
+            Asteroids.drawPath(ctx, position, direction, 1, leftretro, colors);
+			}else{
+			      Asteroids.drawPath(ctx, position, direction, 1, paths, color);//paths
+			}
+			
+						if(rightpushed===true){
+            Asteroids.drawPath(ctx, position, direction, 1, rightretro, coloro);
+			}else{
+			      Asteroids.drawPath(ctx, position, direction, 1, paths, color);//paths
+			}
+			
+			
+			
+        },
+        isDead: function() {
+            return dead;
+        },
+        isInvincible: function() {
+            return invincible;
+        },
+        extraLife: function(game) {
+            game.log.debug('Woo, extra life!');
+            lives++;
+        },
+        die: function(game) {
+            if (!dead) {
+                game.log.info('You died!');
+                dead = true;
+                invincible = true;
+                lives--;
+                position = [GAME_WIDTH/2, GAME_HEIGHT/2];
+                velocity = [0, 0];
+                direction = -Math.PI/2;
+                if (lives > 0) {
+                    setTimeout(function (player, _game) {
+                        return function() {
+                            player.resurrect(_game);
+                        }
+                    }(this, game), DEATH_TIMEOUT);
+                }
+                else {
+                    game.gameOver();
+                }
+            }
+        },
+        resurrect: function(game) {
+            if (dead) {
+                dead = false;
+                invincible = true;
+                lastRez = new Date;
+                setTimeout(function () {
+                    invincible = false;
+                    game.log.debug('No longer invincible!');
+                }, INVINCIBLE_TIMEOUT);
+                game.log.debug('You ressurrected!');
+            }
+        },
+		
+        fire: function(game) {
+            if (!dead) {
+                game.log.debug('You fired!');
+			
+				
+                var _pos = [position[0], position[1]],
+                    _dir = direction;
+
+                this.lowerScore(POINTS_PER_SHOT);
+		document.getElementById('shotsound').play();
+                return Asteroids.bullet(game, _pos, _dir);
+            }
+        },
+		      hit: function(game) {
+            if (!dead) {
+                game.log.debug('You fired!');
+                var _pos = [position[0], position[1]],
+                    _dir = direction;
+				
+          
+                this.lowerScore(POINTS_PER_SHOT);
+              //getbull=player.getPosition;
+		//			document.getElementById('shotsound').play();
+                return Asteroids.bullet(game, _pos, _dir);
+            }
+        }
+		
+    }
+}
+
+Asteroids.bullet = function(game, _pos, _dir) {
+    // implements IScreenObject
+    var position = [_pos[0], _pos[1]],
+		
+						   bpos=position;	
+		             torpX=bpos[0];
+		             torpY=bpos[1];
+					
+			
+					 
+        velocity = [0, 0],
+        direction = _dir,
+        age = 0,
+        radius = 4,
+        path = [
+            [0, 0],
+            [-7, 1],
+			 [7, 1],
+			  [0, 0],
+			 
+        ];
+
+    velocity[0] = BULLET_SPEED * Math.cos(_dir);
+    velocity[1] = BULLET_SPEED * Math.sin(_dir);
+	
+    return {
+        getPosition: function() {
+		
+            return position;
+		
+        },
+        getVelocity: function() {
+            return velocity;
+        },
+        getSpeed: function() {
+            return Math.sqrt(Math.pow(velocity[0], 2) + Math.pow(velocity[1], 2));
+        },
+        getRadius: function() {
+            return radius;
+        },
+        getAge: function() {
+            return age;
+        },
+        birthday: function() {
+            age++;
+        },
+        move: function() {
+            Asteroids.move(position, velocity);
+        },
+        draw: function(ctx) {
+            Asteroids.drawPath(ctx, position, direction, 1, path);
+        },
+    }
+	
+	
+}
+
+Asteroids.keyState = function(_) {
+
+    var state = {
+        [Asteroids.LEFT]: false,
+        [Asteroids.UP]: false,
+        [Asteroids.RIGHT]: false,
+        [Asteroids.DOWN]: false,
+        [Asteroids.FIRE]: false
+	
+    };
+
+    return {
+        on: function(key) {
+            state[key] = true;
+        },
+        off: function(key) {
+            state[key] = false;
+        },
+        getState: function(key) {
+            if (typeof state[key] != 'undefined')
+                return state[key];
+            return false;
+        }
+    }
+}
+
+Asteroids.listen = function(game) {
+
+
+    const keyMap = {
+        "ArrowLeft": Asteroids.LEFT,
+        "KeyA": Asteroids.LEFT,
+        "ArrowRight": Asteroids.RIGHT,
+        "KeyD": Asteroids.RIGHT,
+        "ArrowUp": Asteroids.UP,
+        "KeyW": Asteroids.UP,
+        "Space": Asteroids.FIRE,
+		  "ArrowDown": Asteroids.DOWN
+    };
+
+    window.addEventListener('keydown', function(e) {
+	
+	if(keyworks===true){
+        
+	}
+	const state = keyMap[e.code];
+        if (state) {
+	
+		STARTED_GAME=true;
+		   initstars();
+			
+            e.preventDefault();
+            e.stopPropagation();
+			
+            game.keyState.on(state);
+			
+            return false;
+        }
+        return true;
+    }, true);
+
+	
+
+    window.addEventListener('keyup', function(e) {
+        const state = keyMap[e.code];
+		
+		pushed=false;
+	    leftpushed=false;
+        rightpushed=false;
+		
+		// CHECK if DOWN-key released
+			   if (game.keyState.getState(Asteroids.DOWN)) {//or 40
+			    bulletorpx=targetX;
+				bulletorpy=targetY;
+				
+			if(alienship===true){	// is alien ship active
+			torpedo=true; //fire photon torpedo
+			}
+			
+     PHOTON_TORPS--;
+        }
+		
+		
+	 
+	 
+	 
+        if (state) {
+            e.preventDefault();
+            e.stopPropagation();
+            game.keyState.off(state);
+            return false;
+        }
+        return true;
+    }, true);
+}
+
+Asteroids.asteroid = function (game, _gen) {
+    // implements rocks
+	
+	
+    var position = [0, 0],
+        velocity = [0, 0],
+        direction = 360,
+	
+		
+        generation = _gen,
+        radius = 2,
+			pos=[0,0],
+			   directions = 360,
+   	   apath = [
+            [1, 7],
+            [5, Math.random() * 5],
+            [7, 1],
+            [5, -3],
+            [7, -7],
+            [6, -9],
+            [-Math.random() * 5 +3, -5],
+            [-4, -2],
+            [-8, -1],
+            [-9, 3],
+            [-5, 5],
+            [-1, 3],
+            [1, 7]
+        ];
+
+		
+				alien = [ //alien ship
+            [17, 0],
+            [1, 19],
+            [1, -19],
+      		 [17, 0],
+			
+        ];
+		
+		
+    return {
+        getPosition: function() {
+            return position;
+        },
+        setPosition: function(pos) {
+            position = pos;
+        },
+        getVelocity: function() {
+            return velocity;
+        },
+        setVelocity: function(vel) {
+            velocity = vel;
+            direction = Math.atan2(vel[1], vel[0]);
+        },
+        getSpeed: function() {
+            return Math.sqrt(Math.pow(velocity[0], 2) + Math.pow(velocity[1], 2));
+        },
+        getRadius: function() {
+            return radius * generation;
+        },
+        getGeneration: function() {
+            return generation;
+        },
+        move: function() {
+            Asteroids.move(position, velocity);
+        },
+        draw: function(ctx) {// direction id angle of asteroid
+		direction +=ASTEROID_SPIN;//spin em up
+		
+            Asteroids.drawPath(ctx, position, direction, generation, apath);
+			Asteroids.drawalien(ctx, pos, directions, generation, alien);
+			if(torpedo===true){
+			let vol = document.getElementById("torpedosound");
+vol.volume=0.3;
+					document.getElementById('torpedosound').play();
+			    	Asteroids.fishgone(torpedo);
+					
+			}
+			
+			ctx.fillStyle='orange';
+             ctx.setTransform(1, 0, 0, 1, position[0], position[1]);
+            // ctx.beginPath();
+            //ctx.arc(0, 0, radius*generation, 0, Math.PI*2, false);
+          //   ctx.fill();
+             ctx.closePath();
+        }
+    }
+}
+
+Asteroids.collision = function (a, b) {
+    // if a.getPosition() inside b.getBounds?
+    var a_pos = a.getPosition(),
+        b_pos = b.getPosition();
+
+    function sq (x) {
+        return Math.pow(x, 2);
+		
+    }
+
+
+	           // Kill the asteroid?
+    killit = true; // JS doesn't have "continue 2;"
+                     
+       
+               // blow up sound here
+    var distance = Math.sqrt(sq(a_pos[0] - b_pos[0]) +
+                             sq(a_pos[1] - b_pos[1]));
+
+    if (distance <= a.getRadius() + b.getRadius()+17)
+
+        return true;
+    return false;
+	
+   
+}
+
+Asteroids.level = function(game) {
+    var level = 0,
+        speed = ASTEROID_SPEED,
+        hspeed = ASTEROID_SPEED/2;
+
+    return {
+        getLevel: function() {
+            return level;
+        },
+        levelUp: function(game) {
+            level++;
+            game.log.debug('Congrats! On to level ' + level);
+            while (game.asteroids.generationCount(ASTEROID_GENERATIONS) <
+                   level+ASTEROID_COUNT) {
+                var a = Asteroids.asteroid(game, ASTEROID_GENERATIONS);
+                a.setPosition([Math.random() * GAME_WIDTH,
+                               Math.random() * GAME_HEIGHT]);
+                a.setVelocity([Math.random() * speed - hspeed,
+                               Math.random() * speed - hspeed]);
+                game.asteroids.push(a);
+            }
+        },
+    }
+}
+
+Asteroids.gameOver = function (game) {
+
+    return function () {
+        game.log.debug('Game over!');
+		GAMEOVER=true;
+	explodeexplode(targetX, targetY);//for game over
+	
+        if (game.player.getScore() > 0) {
+            game.highScores.addScore('Player', game.player.getScore());
+        }
+
+     
+            // implements IOverlay
+          
+        
+    }
+}
+
+Asteroids.highScores = function (game) {
+    var scores = [];
+
+    if (t = localStorage.getItem('high-scores')) {
+        scores = JSON.parse(t);
+    }
+    
+    return {
+        getScores: function() {
+            return scores;
+        },
+        addScore: function(_name, _score) {
+            scores.push({name: _name, score: _score});
+            scores.sort(function(a, b){ return b.score - a.score; });
+            if (scores.length > 10) {
+                scores.length = 10;
+            }
+            game.log.debug('Saving high scores.');
+            var str = JSON.stringify(scores);
+            localStorage.setItem('high-scores', str);
+        },
+    }
+}
+
+var ran=0;
+
+
+
+
+Asteroids.fishgone = function(torpedo){// Function to do torpedo stuff
+//location.reload();
+tttt++;
+  ctxtorp.clearRect(0, 0, photon.width, photon.height);
+ torapos=player.getPosition();// asteroids player position of ship
+  		tarX=torapos[0]/3.5;// x translation to my screen
+	    tarY=torapos[1]/3.0;// x translation to my screen
+		
+   // Draw the bullet (triangle)
+  ctxtorp.beginPath();
+  ctxtorp.moveTo(bulletorpx, bulletorpy);
+  ctxtorp.lineTo(bulletorpx + 1, bulletorpy+1);
+  ctxtorp.lineTo(bulletorpx + Math.random() *3.5+2, bulletorpy -Math.random() *3.5+2);
+   ctxtorp.lineTo(bulletorpx - Math.random() *3.5+2, bulletorpy +Math.random() *3.5+2);
+
+  ctxtorp.fillStyle = 'royalblue';
+  ctxtorp.fill();
+  
+ 
+  
+	  ctxtorp.closePath(); 
+  
+ // Calculate the distance between the current position and the target position
+  distorpX = alienX - bulletorpx;
+  distorpY = alienY - bulletorpy;
+
+ // WE ALL HAVE A SELL BY DATE
+
+  
+  // Move the bullet towards the target at a slow pace
+  bulletorpx += (distorpX > 0 ? bulletspeed+0.1 : -bulletspeed);
+  bulletorpy += (distorpY > 0 ? bulletspeed+0.1 : -bulletspeed);
+  
+  // UPDATE LIFESPAN
+BULLETORP_DISTANCE ++;
+
+
+// check if the grim reaper has arrived ooooh
+   if( BULLETORP_DISTANCE >= BULLETORP_DEATH ){
+    bulletorpx=tarX;
+  bulletorpy=tarY;
+   BULLETORP_DISTANCE=0;
+   }
+   
+}
+Asteroids.killalien = function (ctx, pos, directions, scale, alien, color) {
+	 ctxalien.beginPath();
+  ctxalien.moveTo(alienX-12 , alienY+12);
+  ctxalien.lineTo(alienX + 15, alienY +12);
+  ctxalien.lineTo(alienX + 3.5, alienY -Math.random() *7.5);
+  ctxalien.closePath();
+  ctxalien.fillStyle = 'white';
+  ctxalien.fill();
+	
+	 ctxalien.closePath();
+	 
+
+}
+Asteroids.drawalien = function (ctx, pos, directions, scale, alien, color) {
+
+//function drawalien(ctx, pos, directions, scale, alien, color){
+if(STARTED_GAME===true){
+if(alienship===true){
+let vol = document.getElementById("torpedosound");
+vol.volume=0.3;
+document.getElementById('torpedosound').play();
+  ctxalien.clearRect(0, 0, ails.width, ails.height);
+
+  ctxalien.fillStyle = 'white';
+  ctxalien.fillRect(alienX, alienY, 3, 2);
+
+  // Draw the alien's "head" (a triangle)
+  ctxalien.beginPath();
+  ctxalien.moveTo(alienX-2 , alienY+2);
+  ctxalien.lineTo(alienX + 5, alienY +2);
+  ctxalien.lineTo(alienX + 1.5, alienY -Math.random() *1.5);
+  ctxalien.closePath();
+  ctxalien.fillStyle = 'skyblue';
+  ctxalien.fill();
+ // Adjust speed to create a slow movement
+  alienX+=0.01;
+  alienY+=0.009;
+ 
+  if (alienX + 10 > ails.width) {
+   alienX= -10;
+   
+  }
+  if (alienY + 10 > ails.height) {
+  alienY=-10;
+  }
+
+  if (alienY + 20 > ails.height-100) {
+  alienX-=0.3;
+  }
+
+    if (alienY + 20 > ails.height-50) {
+  alienX+=0.4;
+  }
+    if (alienY + 10 < ails.height-30) {
+  alienY+=Math.random() *0.3;
+  }
+  apos=player.getPosition();// asteroids player position of ship
+  		targetX=apos[0]/3.5;// x translation to my screen
+	    targetY=apos[1]/3.0;// x translation to my screen
+		
+     
+   // ctxalien.font = '30px Arial'; // Set font size and type
+  
+
+  
+  
+ 
+  
+  // Function to draw the bullet 
+if(ran===0) {//draw 
+  ctxslug.clearRect(0, 0, ails.width, ails.height);
+
+  // Draw the bullet (triangle)
+  ctxslug.beginPath();
+  ctxslug.moveTo(bulletx, bullety);
+  ctxslug.lineTo(bulletx + 1, bullety+1);
+  ctxslug.lineTo(bulletx + Math.random() *2.5+1, bullety -Math.random() *2.5+1);
+  var xyz=rnd();
+  ctxslug.fillStyle = 'red';
+  ctxslug.fill();
+   ctxslug.fill();
+   ctxslug.fill();
+ 
+     ctxslug.fillStyle = xyz;
+	  ctxslug.closePath();   
+
+ // Calculate the distance between the current position and the target position
+  distanceX = targetX - bulletx;
+  distanceY = targetY - bullety;
+
+  // Move the bullet towards the target at a slow pace
+  bulletx += (distanceX > 0 ? bulletspeed : -bulletspeed);
+  bullety += (distanceY > 0 ? bulletspeed : -bulletspeed);
+  
+  // UPDATE LIFESPAN
+BULLET_DISTANCE ++;
+
+
+// check if the grim reaper has arrived ooooh
+   if( BULLET_DISTANCE >= BULLET_DEATH ){
+    bulletx=alienX;
+  bullety=alienY;
+   BULLET_DISTANCE=0;
+   }
+   
+
+
+  
+}
+
+
+}
+
+}
+}
+
+ function moveBullet() {
+ 
+  
+  
+  
+  
+}
+
+
+
+Asteroids.drawPath = function (ctx, position, direction, scale, path, color) {
+    if (!color) {
+        color = '#fff';
+    }
+let coloros ='yellow';	
+//scale+=2.1; //size of ship
+
+ 	 	//ctx.fillText('kkk'+'   ' + distorpY, 0, 0);	 
+
+	ctx.lineWidth=0.5;
+    ctx.strokeStyle = color;
+    ctx.setTransform(Math.cos(direction) * scale, Math.sin(direction) * scale,
+                     -Math.sin(direction) * scale, Math.cos(direction) * scale,
+                     position[0], position[1]);
+
+    ctx.beginPath();
+	
+	
+    ctx.moveTo(path[0][0], path[0][1]);
+    for (i=1; i<path.length; i++) {
+        ctx.lineTo(path[i][0], path[i][1]);
+    }
+    ctx.stroke();
+    ctx.closePath();
+    ctx.strokeStyle = '#fff';
+
+}
+
+Asteroids.move = function (position, velocity) {//move rocks
+    position[0] += velocity[0];
+    if (position[0] < 0)
+        position[0] = GAME_WIDTH + position[0];
+    else if (position[0] > GAME_WIDTH)
+        position[0] -= GAME_WIDTH;
+
+    position[1] += velocity[1];
+    if (position[1] < 0)
+        position[1] = GAME_HEIGHT + position[1];
+    else if (position[1] > GAME_HEIGHT)
+        position[1] -= GAME_HEIGHT;
+}
+
+Asteroids.stars = function () {
+    var stars = [];
+    for (var i=0; i<270; i++) {
+
+        stars.push([Math.random()*GAME_WIDTH, Math.random()*GAME_HEIGHT]);
+	
+    }
+
+    return {
+        draw: function(ctx) {
+		    var speedos = 1; // Adjust the speed of stars
+    
+		
+		var holex=GAME_WIDTH/2;
+		var holey=GAME_HEIGHT/2;
+			
+            var ii = stars.length;
+            for(var i=0; i<ii; i++) {
+		
+			var xxx=  stars[i][0];
+			var yyy= stars[i][1];
+			//SET TRIG
+			 var anglels = Math.atan2(GAME_HEIGHT/2 - stars[i][1], GAME_WIDTH/2 - stars[i][0]);
+     stars[i][0] += Math.cos(anglels) * speedos;
+     stars[i][1] += Math.sin(anglels) * speedos;
+	
+			//check if fell into black hole
+			    const distanceToBlackHole = Math.sqrt((xxx - holex) ** 2 + (yyy- holey) ** 2);
+      if (distanceToBlackHole < 37) {// set event horizon
+         stars[i][0] = Math.random() * GAME_WIDTH;//x
+         stars[i][1] = Math.random() * GAME_HEIGHT;//y
+	
+      }
+	 
+					var colr= rnd();// setrandom color for each star	
+			STAR_SIZE=Math.random() * STARSIZE_MULTIPLIER;//set random size for each star
+				      ctx.fillStyle = colr;   
+     // ctx.arc(stars[i][0], stars[i][1], Math.random() *7.9, 7, 7);// way too slow
+      ctx.fillRect(stars[i][0], stars[i][1], STAR_SIZE, STAR_SIZE); // better
+     //ctx.roundRect(stars[i][0], stars[i][1], STAR_SIZE, STAR_SIZE, 12);// too slow but interesting
+
+            }
+			ctx.strokeStyle=colr;
+		    ctx.stroke();	
+			
+
+        }
+    }
+}
+
+Asteroids.play = function (game) {
+    var ctx = game.playfield.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = 'white';
+ 
+    var speed = ASTEROID_SPEED,
+        hspeed = ASTEROID_SPEED/2;
+
+    game.level.levelUp(game);
+
+    var bullets = [],
+	
+        last_fire_state = false,
+		
+        last_asteroid_count = 0;
+
+    var extra_lives = 0;
+var bull=[];
+    // Add a star field.
+    game.overlays.add(Asteroids.stars());
+
+	
+	
+// main loop
+    game.pulse = setInterval(function(){
+	
+		if(STARTED_GAME===false)	{	
+	     game.overlays.add({
+            // implements IOverlay
+            draw: function (ctx) {
+		//	ctx.fillStyle='green';
+                ctx.font = '20px System, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillText('INSTRUCTIONS', GAME_WIDTH/2, GAME_HEIGHT/7);
+                ctx.fillText('UP = ARROW-UP', GAME_WIDTH/2, GAME_HEIGHT/7+30);
+				ctx.fillText('LEFT = ARROW-LEFT', GAME_WIDTH/2, GAME_HEIGHT/7+60);
+				ctx.fillText('RIGHT = ARROW-RIGHT', GAME_WIDTH/2, GAME_HEIGHT/7+90);
+				ctx.fillText('FIRE = SPACE-BAR', GAME_WIDTH/2, GAME_HEIGHT/7+120);
+				ctx.fillText('FIRE-PHOTON-TORPEDO = ARROW-DOWN', GAME_WIDTH/2, GAME_HEIGHT/7+150);
+				ctx.fillText('Shoot all rocks but avoid crashing as you will die', GAME_WIDTH/2, GAME_HEIGHT/7+180);
+                ctx.fillText('beware Alien Space ship, he will Attack, Good Luck', GAME_WIDTH/2, GAME_HEIGHT/7+210);
+				
+				
+				var scores = game.highScores.getScores();
+                ctx.font = '12px System, monospace';
+			
+                for (var i=0; i<scores.length; i++) {
+                    ctx.fillText(scores[i].name + '   ' + scores[i].score,
+                                 GAME_WIDTH/2, GAME_HEIGHT/7 + 230 + 14 * i);
+                }
+            },
+        });
+
+	}
+	
+	
+	
+        var kill_asteroids = [],
+            new_asteroids = [],
+            kill_bullets = [];
+	
+	countup=countup+0.01;
+        ctx.save();
+        ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+		
+		if(GAMEOVER===true){
+		                  ctx.font = '30px System, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+				ctx.fillStyle='lightgreen';
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+	 ctx.fillText('GAME OVER', GAME_WIDTH/2, GAME_HEIGHT/2);
+				var scores = game.highScores.getScores();
+                ctx.font = '14px System, monospace';
+			
+                for (var i=0; i<scores.length; i++) {
+                    ctx.fillText(scores[i].name + '   ' + scores[i].score,
+                                 GAME_WIDTH/2, GAME_HEIGHT/5 + 150 + 14 * i);
+                }
+		
+		
+		}
+	
+	var aliencraft	=[alienX,alienY];
+		
+
+		 // Alien Craft Has been HIT BY PHOTON YOU KILLED AN ALIEN SHIP YEAAH !
+    if (Math.abs(distorpX) < 1 && Math.abs(distorpY) < 1) {
+	//	Asteroids.killalien(ctx, pos, directions, scale, alien, color);
+	alienship=false;
+	  ctxslug.clearRect(0, 0, ails.width, ails.height);
+       ctxalien.clearRect(0, 0, ails.width, ails.height);
+	       ctxtorp.clearRect(0, 0, photon.width, photon.height);
+	//reset all
+ distorpX=0;  
+  distorpY =100;
+  
+  bulletorpx=targetX ;
+  bulletorpy=targetY ;
+  
+    bulletx=alienX;
+  bullety=alienY;
+    bulletspeed = 0.2;
+	torpedo=false;
+
+	AILIEN_HIT++;
+	
+
+	 //check.innerHTML = '  PHOTONS:  ' + AILIEN_HIT;
+	if (AILIEN_HIT>1){
+
+            game.player.extraLife(game);
+    
+	  AILIEN_HIT=0;
+	}
+	
+	let vol = document.getElementById("crashsound");
+vol.volume=0.3;
+	document.getElementById('crashsound').play();
+	  game.player.addScore(AIENKILLED_SCORE);
+
+	
+  }
+  
+    // Check if the alien bullet has reached its target YOU OH NO!
+  if (Math.abs(distanceX) < 1 && Math.abs(distanceY) < 1) {
+  
+   
+
+      	//reset all
+ distorpX=0;  
+  distorpY =100;
+  
+  bulletorpx=targetX ;
+  bulletorpy=targetY ;
+    
+  // Once the bullet reaches the target or is shot, reset the positions and speed
+  bulletx=alienX;
+  bullety=alienY;
+    bulletspeed = 0.2;
+	let vol = document.getElementById("crashsound");
+vol.volume=0.3;
+	document.getElementById('crashsound').play();
+   game.player.die(game);// hit  by alien missile OOPS
+  }			
+		
+   
+        // Be nice and award extra lives first. HAHA
+        var t_extra_lives = game.player.getScore() / POINTS_TO_EXTRA_LIFE;
+        t_extra_lives = Math.floor(t_extra_lives);
+        if (t_extra_lives > extra_lives) {
+            game.player.extraLife(game);
+        }
+        extra_lives = t_extra_lives;
+
+        if (game.keyState.getState(Asteroids.UP)) {
+			pushed=true;
+            game.player.thrust(THRUST_ACCEL);
+        }
+
+        if (game.keyState.getState(Asteroids.LEFT)) {
+			rightpushed=true;
+            game.player.rotate(-ROTATE_SPEED);
+        }
+
+	
+        if (game.keyState.getState(Asteroids.RIGHT)) {
+			leftpushed=true;
+            game.player.rotate(ROTATE_SPEED);
+        }
+
+        var fire_state = game.keyState.getState(Asteroids.FIRE);
+        if (fire_state &&
+            (fire_state != last_fire_state) &&
+            (bullets.length < MAX_BULLETS)) {
+            var b = game.player.fire(game);
+	
+            bullets.push(b);
+
+	
+		
+        }
+		
+		
+        last_fire_state = fire_state;
+
+        if (!game.player.isDead()) {
+            game.player.move();
+            game.player.draw(ctx);
+        }
+
+        for (var k=0; k<bullets.length; k++) {
+            if (!bullets[k])
+                continue;
+
+            if (bullets[k].getAge() > MAX_BULLET_AGE) {
+                kill_bullets.push(k);
+                continue;
+            }
+            bullets[k].birthday();
+            bullets[k].move();
+            bullets[k].draw(ctx);
+        }
+
+        for (var r=kill_bullets.length-1; r>=0; r--) {
+            bullets.splice(r, 1);
+        }
+	
+        var asteroids = game.asteroids.getIterator();
+        for (var i=0; i<game.asteroids.length; i++) {
+            var killit = false;
+            asteroids[i].move();
+            asteroids[i].draw(ctx);
+
+            // Destroy the asteroid
+            for (var j=0; j<bullets.length; j++) {
+			checks=bullets[j];
+				bullx=bullets[j];//get coordinates
+                if (!bullets[j])
+			
+                    continue;
+					
+		
+		
+                if (Asteroids.collision(bullets[j], asteroids[i])) {
+                    game.log.debug('You shot an asteroid!');
+			let vol = document.getElementById("crashsound");
+vol.volume=0.3;
+		 	document.getElementById('crashsound').play();
+					var delay=100;
+					 ctx.fill();// glow orange
+					 	 ctx.fill();// glow orange
+			
+					overlay.style.visibility='visible';  	 	
+                                   startTime = Date.now() ;
+				
+					
+					
+							ctx.fill();// glow orange GLOW GLOW
+					 	 ctx.fill();// glow orange
+				
+				       
+						
+                    // Destroy the bullet.
+                    bullets.splice(j, 1);
+				
+                    killit = true; 
+				
+                    continue;
+				
+                }
+            }
+
+            // Kill the asteroid?
+            if (killit) {
+                var _gen = asteroids[i].getGeneration() - 1;
+                if (_gen > 0) {
+                    // Create children ;)
+					 ctx.fill();
+                    for (var n=0; n<ASTEROID_CHILDREN; n++) {
+                        var a = Asteroids.asteroid(game, _gen);
+                        var _pos = [asteroids[i].getPosition()[0],
+                                    asteroids[i].getPosition()[1]];
+                        a.setPosition(_pos);
+                        a.setVelocity([Math.random() * speed - hspeed,
+                                       Math.random() * speed - hspeed]);
+                        new_asteroids.push(a);
+                    }
+                }
+                game.player.addScore(ASTEROID_SCORE);
+			//  game.player.addCheck(ASTEROID_SCORE);
+			
+                kill_asteroids.push(i);
+				
+                continue;
+            }
+
+            // crashed into asteroid Kill the player?
+            if (!game.player.isDead() &&
+                !game.player.isInvincible() &&
+				
+                Asteroids.collision(game.player, asteroids[i])) {
+				
+				  let vol = document.getElementById("crashsound");
+vol.volume=0.3;
+		 	document.getElementById('crashsound').play();
+			//now kill asteroid
+			                var _gen = asteroids[i].getGeneration() - 1;
+                if (_gen > 0) {
+                    // Create children ;)
+					 ctx.fill();//flash explosion
+                    for (var n=0; n<ASTEROID_CHILDREN; n++) {
+                        var a = Asteroids.asteroid(game, _gen);
+                        var _pos = [asteroids[i].getPosition()[0],
+                                    asteroids[i].getPosition()[1]];
+                        a.setPosition(_pos);
+                        a.setVelocity([Math.random() * speed - hspeed,
+                                       Math.random() * speed - hspeed]);
+                        new_asteroids.push(a);
+                    }
+                }
+				
+				if(STARTED_GAME===true)	{	
+                game.player.addScore(ASTEROID_SCORE);
+		    }
+                kill_asteroids.push(i);
+			 	if(STARTED_GAME===true)	{			
+     
+                game.player.die(game);// lose life
+				}
+				
+            }
+        }
+
+        kill_asteroids.sort(function(a, b) { return a - b; });
+        for (var m=kill_asteroids.length-1; m>=0; m--) {
+            game.asteroids.splice(kill_asteroids[m], 1);
+        }
+
+        for (var o=0; o<new_asteroids.length; o++) {
+            game.asteroids.push(new_asteroids[o]);
+        }
+
+        ctx.restore();
+
+        // Do we need to level up?
+        if (0 == game.asteroids.length && 
+            last_asteroid_count != 0) {
+            setTimeout(function() {
+                game.level.levelUp(game);
+            }, LEVEL_TIMEOUT);
+        }
+
+        last_asteroid_count = game.asteroids.length;
+
+        // Draw overlays.
+		if(STARTED_GAME===false){
+        game.overlays.draw(ctx);
+}
+        // Update the info pane.
+        game.info.setLives(game, game.player.getLives()-life);
+        game.info.setScore(game, game.player.getScore());
+		game.info.setCheck(game, game.player.getCheck());
+        game.info.setLevel(game, game.level.getLevel());
+ 
+ 
+ 
+ function flash(){// flash initiated on destruction of asteroid
+ overlay.style.visibility='hidden'; //brutaly turn off white flash 1/2 second after iteration of main loop
+  elapsedTime =`Time elapsed: ${Date.now() - startTime} ms`;
+  
+
+  
+  
+	}	
+		
+	 setTimeout(function () {flash(); }, 700);
+		
+
+		
+		
+		
+		
+		
+    }, FRAME_PERIOD);// crappy set timeout , !!!!brutal really!!!!
+	
+
+	
+}
+
+onOffCycle();
+//this is a latch turns/off on every 20 secs 
+	function onOffCycle() {
+  // Turn on after 20 seconds
+  setTimeout(() => {
+ 	alienship=true;	
+    // Turn off after 20 seconds
+	
+    setTimeout(() => {
+     ctxslug.clearRect(0, 0, ails.width, ails.height);
+  ctxalien.clearRect(0, 0, ails.width, ails.height);
+
+	  alienship=false;
+      // Restart the cycle
+      onOffCycle();
+    }, 20000); // 20 seconds
+  },  10000); // 20 seconds
+}
+
+Asteroids.LEFT = 37;
+Asteroids.UP = 38;
+Asteroids.RIGHT = 39;
+Asteroids.DOWN = 40;
+Asteroids.FIRE = 32;
+
+// Load it up!
+
+
+
+	window.addEventListener('load', function() {
+ 		if(STARTED_GAME===false)	{	
+	  const audio = document.getElementById("gameoversound");
+  audio.play();
+  	
+	Asteroids(document.getElementById('asteroids'));
+	}
+	
+});
+	
+	
+
+window.addEventListener("resize", handleResize);
+function handleResize() {
+  width =  window.innerWidth;
+  height =  window.innerHeight;
+GAME_HEIGHT = window.innerHeight-40;
+GAME_WIDTH = window.innerWidth-30;
+  ctx.clearRect(0, 0, width, height);
+}
+</script>
+</body>
+</html>
